@@ -14,6 +14,8 @@ class OpenCVReader:
             self.cvt_color = None
 
     def __call__(self, filename, is_mask=False):
+        # Normalize path separators for cross-platform compatibility
+        filename = filename.replace('/', os.sep).replace('\\', os.sep)
         filename = os.path.join(self.image_dir, filename)
         assert os.path.exists(filename), filename
         if is_mask:

@@ -48,7 +48,15 @@ def efficientnet_b3(pretrained, outblocks, outstrides, pretrained_model=""):
     )
 
 
-def efficientnet_b4(pretrained, outblocks, outstrides, pretrained_model=""):
+def efficientnet_b4(pretrained, outblocks=None, outstrides=None, outlayers=None, pretrained_model=""):
+    # Handle outlayers -> outblocks conversion for backward compatibility
+    if outlayers is not None and outblocks is None:
+        outblocks = outlayers
+    # Default values if not provided
+    if outblocks is None:
+        outblocks = [1, 2, 3, 4]
+    if outstrides is None:
+        outstrides = [4, 8, 16, 32]
     return build_efficient(
         "efficientnet-b4", pretrained, outblocks, outstrides, pretrained_model
     )

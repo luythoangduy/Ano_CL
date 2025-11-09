@@ -1,27 +1,39 @@
-wandb:
-  enabled: true
-  project: UniAD-MVTec-single
-  entity: null
-  name: local_500_256_256_0.4mse_0.6spatial_mse_3non_beta2
-  tags:
-    - mvtec
-    - anomaly-detection
-    - spatial-focal-loss
-    - local
-  notes: UniAD with Spatial Region Focal Loss (pure) on MVTec-AD dataset - Local Training
-  mode: online
-  group: null
-  job_type: train
-  resume: allow
-  run_id: null
-  dir: null
-  login: true
-  api_key: 0f2ca680372a916c31aab5ede7bbefab410fe503
-
 version: v1.0.0
 random_seed: 133
 port: 11111
 
+# Continual Learning Configuration
+continual_learning:
+  # Task order - order in which classes are learned
+  class_order:
+    - bottle
+    - cable
+    - capsule
+    - carpet
+    - grid
+    - hazelnut
+    - leather
+    - metal_nut
+    - pill
+    - screw
+    - tile
+    - toothbrush
+    - transistor
+    - wood
+    - zipper
+
+  # Number of classes per task (can be int or list)
+  # If int: same number of classes for all tasks
+  # If list: specific number for each task
+  classes_per_task: 1  # 1 class per task = 15 tasks total
+
+  # Training epochs per task
+  epochs_per_task: 1
+
+  # Learning rate schedule
+  min_lr: 1.0e-08
+
+# Dataset Configuration
 dataset:
   type: custom
   image_reader:
@@ -51,30 +63,25 @@ dataset:
   batch_size: 8
   workers: 4
 
+# Loss Configuration
 criterion:
   - name: FeatureMSELoss
     type: FeatureMSELoss
     kwargs:
       weight: 1.0
-      # mse_weight: 0 # 40% MSE for stability
-      # spatial_focal_weight: 1 # 60% Spatial Focal for performance
-      # beta: 2 # Moderate focusing strength
-      # epsilon: 0.001
-      # loss_type: mse
-      # region_size: 3 # 3x3 regions
-      # overlap: False
 
+# Trainer Configuration
 trainer:
-  max_epoch: 500
+  max_epoch: 100  # This will be overridden by continual_learning.epochs_per_task
   clip_max_norm: 0.1
   val_freq_epoch: 10
   print_freq_step: 100
   tb_freq_step: 1
   lr_scheduler:
-    type: StepLR
+    type: CosineAnnealingLR
     kwargs:
-      step_size: 500
-      gamma: 0.1
+      T_max: 100  # Should match epochs_per_task
+      eta_min: 1.0e-08
   optimizer:
     type: AdamW
     kwargs:
@@ -84,15 +91,17 @@ trainer:
         - 0.999
       weight_decay: 0.0001
 
+# Saver Configuration
 saver:
-  auto_resume: true
+  auto_resume: false
   always_save: false
   load_path: null
-  save_dir: checkpoints/
-  log_dir: log/
+  save_dir: checkpoints_cl/
+  log_dir: logs_cl/
 
+# Evaluator Configuration
 evaluator:
-  save_dir: result_eval_temp
+  save_dir: result_eval_cl
   key_metric: mean_pixel_auc
   metrics:
     auc:
@@ -104,13 +113,15 @@ evaluator:
             - 16
       - name: pixel
   vis_compound:
-    save_dir: ./tools/vis_compound
+    save_dir: ./tools/vis_compound_cl
     max_score: null
     min_score: null
 
+# Frozen layers (not trained during CL)
 frozen_layers:
   - backbone
 
+# Network Architecture
 net:
   - name: backbone
     type: models.backbones.efficientnet_b4
@@ -122,10 +133,17 @@ net:
         - 2
         - 3
         - 4
+      outstrides:
+        - 4
+        - 8
+        - 16
+        - 32
   - name: neck
     prev: backbone
     type: models.necks.MFCN
     kwargs:
+      outplanes:
+        - 120
       outstrides:
         - 16
   - name: reconstruction
@@ -149,6 +167,27 @@ net:
         scale: 20.0
         prob: 1.0
       save_recon:
-        save_dir: result_recon
+        save_dir: result_recon_cl
       initializer:
         method: xavier_uniform
+
+# WandB Configuration (optional)
+wandb:
+  enabled: false
+  project: UniAD-MVTec-CL
+  entity: null
+  name: continual_learning_baseline
+  tags:
+    - continual-learning
+    - anomaly-detection
+    - mvtec
+    - baseline
+  notes: Continual Learning baseline for UniAD on MVTec-AD without replay
+  mode: online
+  group: null
+  job_type: continual_train
+  resume: allow
+  run_id: null
+  dir: null
+  login: false
+  api_key: null

@@ -17,6 +17,9 @@ class MFCN(nn.Module):
         self.outplanes = outplanes
         self.instrides = instrides
         self.outstrides = outstrides
+
+        # Debug: print initialization info
+        print(f"MFCN init: inplanes={inplanes}, instrides={instrides}, outstrides={outstrides}")
         self.scale_factors = [
             in_stride / outstrides[0] for in_stride in instrides
         ]  # for resize
@@ -29,11 +32,32 @@ class MFCN(nn.Module):
         features = input["features"]
         assert len(self.inplanes) == len(features)
 
+        # Get target size from outstrides
+        # Assume input image size is 224x224 (can be inferred from first feature)
+        target_size = 224 // self.outstrides[0]  # e.g., 224 // 16 = 14
+
         feature_list = []
         # resize & concatenate
         for i in range(len(features)):
-            upsample = self.upsample_list[i]
-            feature_resize = upsample(features[i])
+            feature = features[i]
+            h, w = feature.shape[2], feature.shape[3]
+
+            # Calculate scale factor based on actual feature size
+            scale_h = target_size / h
+            scale_w = target_size / w
+
+            # Use adaptive resize instead of fixed scale_factor
+            if scale_h != 1.0 or scale_w != 1.0:
+                import torch.nn.functional as F
+                feature_resize = F.interpolate(
+                    feature,
+                    size=(target_size, target_size),
+                    mode='bilinear',
+                    align_corners=False
+                )
+            else:
+                feature_resize = feature
+
             feature_list.append(feature_resize)
 
         feature_align = torch.cat(feature_list, dim=1)

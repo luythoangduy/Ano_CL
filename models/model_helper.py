@@ -12,6 +12,9 @@ class ModelHelper(nn.Module):
     def __init__(self, cfg):
         super(ModelHelper, self).__init__()
 
+        # Initialize device attribute
+        self.device = torch.device("cpu")
+
         self.frozen_layers = []
         for cfg_subnet in cfg:
             mname = cfg_subnet["name"]
@@ -33,9 +36,20 @@ class ModelHelper(nn.Module):
         cls = getattr(module, cls_name)
         return cls(**kwargs)
 
-    def cuda(self):
-        self.device = torch.device("cuda")
-        return super(ModelHelper, self).cuda()
+    def to(self, device):
+        """Override to() to track device"""
+        if isinstance(device, str):
+            self.device = torch.device(device)
+        elif isinstance(device, torch.device):
+            self.device = device
+        return super(ModelHelper, self).to(device)
+
+    def cuda(self, device=None):
+        if device is None:
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device(f"cuda:{device}")
+        return super(ModelHelper, self).cuda(device)
 
     def cpu(self):
         self.device = torch.device("cpu")
