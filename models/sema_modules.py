@@ -259,6 +259,7 @@ class SEMAModules(nn.Module):
             self.training and
             z_scores.mean(dim=1).min() > self.exp_threshold
         )
+        print(f"Layer {self.layer_id} - Z-scores: {z_scores.mean(dim=1).tolist()} - Expand: {should_expand}")
 
         if should_expand:
             # Add new adapter
