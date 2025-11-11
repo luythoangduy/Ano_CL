@@ -131,7 +131,6 @@ class SEMATransformerEncoderLayer(nn.Module):
         src = self.norm2(src)
 
         # SEMA adapter after FFN
-        print('self.use_sema',self.use_sema)
         if self.sema_ffn is not None:
             sema_out = self.sema_ffn(src)
             if self.sema_mode == 'parallel':

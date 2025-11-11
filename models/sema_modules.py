@@ -172,7 +172,7 @@ class SEMAModules(nn.Module):
             initialize: If True, this is the first adapter (no router update)
         """
         adapter_id = f"layer_{self.layer_id}.adapter_{len(self.adapters)}"
-        print(f"Adding adapter: {adapter_id}")
+        logging.info(f"✨ Adding adapter: {adapter_id}")
         # Create new adapter
         new_adapter = AdapterModule(
             adapter_id=adapter_id,
@@ -198,6 +198,9 @@ class SEMAModules(nn.Module):
         new_dim = len(self.adapters)
         merged_router = nn.Linear(self.d_model, new_dim)
 
+        # Get device from current router
+        device = self.router.weight.device
+
         # Copy weights from old router
         with torch.no_grad():
             old_weight = self.router.weight.data  # [old_dim, d_model]
@@ -210,7 +213,8 @@ class SEMAModules(nn.Module):
             merged_router.weight.data = torch.cat([old_weight, new_weight], dim=0)
             merged_router.bias.data = torch.cat([old_bias, new_bias], dim=0)
 
-        self.router = merged_router
+        # Move merged router to correct device
+        self.router = merged_router.to(device)
         self.new_router = None
 
     def forward(self, x):
@@ -233,7 +237,7 @@ class SEMAModules(nn.Module):
             out = self.adapters[0](x)
             return {
                 'output': out['func_out'],
-                'rd_loss': out['rd_loss'],
+                'rd_loss': out['rd_loss'].to(device),  # Ensure device
                 'added': False
             }
 
@@ -245,8 +249,8 @@ class SEMAModules(nn.Module):
         for adapter in self.adapters:
             out = adapter(x)
             func_outs.append(out['func_out'])
-            rd_losses.append(out['rd_loss'])
-            z_scores.append(out['z_score'])
+            rd_losses.append(out['rd_loss'].to(device))  # Ensure device
+            z_scores.append(out['z_score'].to(device))  # Ensure device
 
         func_outs = torch.stack(func_outs)  # [num_adapters, ...]
         rd_losses = torch.stack(rd_losses)  # [num_adapters, batch]
@@ -259,7 +263,6 @@ class SEMAModules(nn.Module):
             self.training and
             z_scores.mean(dim=1).min() > self.exp_threshold
         )
-        print(f"Layer {self.layer_id} - Z-scores: {z_scores.mean(dim=1).tolist()} - Expand: {should_expand}")
 
         if should_expand:
             # Add new adapter
@@ -303,33 +306,49 @@ class SEMAModules(nn.Module):
 
         mixed_output = (func_outs * weights).sum(dim=0)
 
-        # RD loss (only for newly added adapter)
-        if self.adapters[-1].newly_added:
-            rd_loss = rd_losses[-1].mean()
-        else:
-            rd_loss = torch.tensor(0.0, device=device)
-
+        # RD loss (only for trainable adapters - FIX from previous issue)
+        rd_loss = torch.tensor(0.0, device=device)
+        num_trainable = 0
+        for i, adapter in enumerate(self.adapters):
+            if adapter.training:
+                rd_loss += rd_losses[i].mean()  # [batch]rate(self.adapters):
+                num_trainable += 1pter is trainable (not frozen)
+   if adapter.newly_added or any(p.requires_grad for p in adapter.functional.parameters()):
+        rd_loss = rd_loss / num_trainable if num_trainable > 0 else rd_loss                rd_loss = rd_loss + rd_losses[i].mean()
+ 1
         return {
-            'output': mixed_output,
+            'output': mixed_output,ble adapters
             'rd_loss': rd_loss,
-            'added': False
+            'added': Falses / num_trainable
         }
 
-    def end_task_training(self):
-        """Called after each task - freeze adapters and merge routers"""
-        # Freeze all adapters
+    def end_task_training(self):utput,
+        """Called after each task - freeze adapters and merge routers"""            'rd_loss': rd_loss,
+        # Freeze all adapterslse
         for adapter in self.adapters:
             adapter.freeze()
-
-        # Merge routers if needed
+    def end_task_training(self):
+        # Merge routers if neededer each task - freeze adapters and merge routers"""
         self._merge_routers()
-
+        for adapter in self.adapters:
         # Freeze router
         for param in self.router.parameters():
             param.requires_grad = False
 
         # Reset flags
-        self.added_for_task = False
+        self.added_for_task = False        # Freeze router
+ers():
+        logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters")
+
+    def enable_outlier_detection(self):        # Reset flags
+
+
+
+
+
+
+
+        self.detecting_outlier = False        """Disable outlier detection"""    def disable_outlier_detection(self):        self.detecting_outlier = True        """Enable outlier detection for next task"""        self.added_for_task = False
 
         logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters")
 

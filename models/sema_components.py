@@ -183,6 +183,7 @@ class RDLossRecords:
         self._mean = 0.0
         self._var = 0.0
         self.updating = True
+        self.device = 'cpu'  # Default device
 
     @property
     def length(self):
@@ -206,7 +207,12 @@ class RDLossRecords:
         if not self.updating:
             return
 
-        losses = losses.detach().cpu()
+        # Update device from input
+        if losses.device != torch.device('cpu'):
+            self.device = losses.device
+            self.record = self.record.to(self.device)
+
+        losses = losses.detach()  # Remove .cpu() - keep on same device
 
         if self._curr_len < self._max_len:
             # Still have space
@@ -241,9 +247,10 @@ class RDLossRecords:
             # Not enough data
             return torch.zeros_like(losses)
 
+        # Ensure on same device
         z_score = (losses - self._mean) / (self.stddev + 1e-8)
         z_score = torch.abs(z_score)
-        return z_score
+        return z_score.to(losses.device)  # Ensure output on correct device
 
     def freeze(self):
         """Stop updating records (called after task ends)"""
