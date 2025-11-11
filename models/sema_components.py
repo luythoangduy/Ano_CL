@@ -120,8 +120,8 @@ class RepresentationDescriptor(nn.Module):
         self.rd_dim = rd_dim
 
         # AutoEncoder
-        self.encoder = nn.Linear(self.input_dim, rd_dim)
-        self.decoder = nn.Linear(rd_dim, self.input_dim)
+        self.encoder = nn.Linear(self.input_dim, rd_dim).to(device='cuda')
+        self.decoder = nn.Linear(rd_dim, self.input_dim).to(device='cuda')
 
         self._init_weights()
 
