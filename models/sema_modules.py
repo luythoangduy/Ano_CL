@@ -187,7 +187,9 @@ class SEMAModules(nn.Module):
 
         # Update router if not first adapter
         if not initialize:
-            self.new_router = nn.Linear(self.d_model, 1)
+            # Get device from existing router
+            device = self.router.weight.device
+            self.new_router = nn.Linear(self.d_model, 1).to(device)  # ← Move to device immediately
             logging.info(f"✨ Adapter {adapter_id} added at layer {self.layer_id}")
 
     def _merge_routers(self):
