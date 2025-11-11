@@ -74,7 +74,9 @@ class Adapter(nn.Module):
             Adapter output [..., d_model]
         """
         residual = x
-
+        device = x.device
+        if next(self.adapter_layer_norm_before.parameters()).device != device:
+            self.adapter_layer_norm_before = self.adapter_layer_norm_before.to(device)
         if self.adapter_layernorm_option == 'in':
             x = self.adapter_layer_norm_before(x)
 
