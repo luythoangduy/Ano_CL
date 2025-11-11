@@ -81,6 +81,7 @@ class SEMATransformerEncoderLayer(nn.Module):
                 self.sema_attn = None
 
             if self.sema_position in ['ffn', 'both']:
+                print(f'Using Sema')
                 self.sema_ffn = SEMAModules(
                     layer_id=layer_id,
                     config=sema_config,
@@ -130,6 +131,7 @@ class SEMATransformerEncoderLayer(nn.Module):
         src = self.norm2(src)
 
         # SEMA adapter after FFN
+        print('self.use_sema',self.use_sema)
         if self.sema_ffn is not None:
             sema_out = self.sema_ffn(src)
             if self.sema_mode == 'parallel':
@@ -138,7 +140,6 @@ class SEMATransformerEncoderLayer(nn.Module):
                 src = sema_out['output']
             sema_rd_loss = sema_rd_loss + sema_out['rd_loss']
             sema_added = sema_added or sema_out['added']
-
         return src, sema_rd_loss, sema_added
 
     def forward_pre(
