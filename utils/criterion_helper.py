@@ -352,7 +352,7 @@ class CombinedMSESpatialFocalLoss(nn.Module):
 
 class ImageMSELoss(nn.Module):
     """Train a decoder for visualization of reconstructed features"""
-    
+
     def __init__(self, weight):
         super().__init__()
         self.criterion_mse = nn.MSELoss()
@@ -362,6 +362,24 @@ class ImageMSELoss(nn.Module):
         image = input["image"]
         image_rec = input["image_rec"]
         return self.criterion_mse(image, image_rec)
+
+
+class SEMARDLoss(nn.Module):
+    """
+    SEMA Representation Descriptor Loss
+    Auxiliary loss for training RD in SEMA adapters
+    """
+    def __init__(self, weight):
+        super().__init__()
+        self.weight = weight
+
+    def forward(self, input):
+        # Check if SEMA RD loss exists in output
+        if "sema_rd_loss" in input:
+            return input["sema_rd_loss"]
+        else:
+            # Return zero if SEMA not used
+            return torch.tensor(0.0, device=next(iter(input.values())).device)
 
 
 def build_criterion(config):

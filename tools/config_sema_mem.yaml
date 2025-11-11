@@ -1,0 +1,159 @@
+version: v1.0.0-sema-mem
+random_seed: 133
+port: 11111
+
+# CL Strategy
+cl_strategy: sema_mem_expand  # ← SEMA + Memory Expansion
+
+continual_learning:
+  class_order:
+    - bottle
+    - cable
+    - capsule
+    - carpet
+    - grid
+    - hazelnut
+    - leather
+    - metal_nut
+    - pill
+    - screw
+    - tile
+    - toothbrush
+    - transistor
+    - wood
+    - zipper
+  classes_per_task: 1
+  epochs_per_task: 100
+  min_lr: 1.0e-08
+
+# SEMA Configuration
+sema:
+  use_sema: true
+  sema_position: ffn
+  sema_mode: parallel
+  adapter_bottleneck: 64
+  adapter_dropout: 0.1
+  adapter_scalar: 1.0
+  adapter_layernorm: in
+  rd_dim: 64
+  rd_buffer_size: 500
+  expansion_threshold: 3.0
+  sema_start_layer: 0
+  sema_end_layer: 7
+  rd_loss_weight: 0.1
+
+dataset:
+  type: custom
+  image_reader:
+    type: opencv
+    kwargs:
+      image_dir: ./data/MVTec-AD/mvtec_anomaly_detection
+      color_mode: RGB
+  train:
+    meta_file: ./data/MVTec-AD/train.json
+    rebalance: false
+    hflip: false
+    vflip: false
+    rotate: false
+  test:
+    meta_file: ./data/MVTec-AD/test.json
+  input_size: [224, 224]
+  pixel_mean: [0.485, 0.456, 0.406]
+  pixel_std: [0.229, 0.224, 0.225]
+  batch_size: 8
+  workers: 4
+
+criterion:
+  - name: FeatureMSELoss
+    type: FeatureMSELoss
+    kwargs:
+      weight: 1.0
+
+trainer:
+  max_epoch: 100
+  clip_max_norm: 0.1
+  val_freq_epoch: 10
+  print_freq_step: 100
+  tb_freq_step: 1
+  lr_scheduler:
+    type: CosineAnnealingLR
+    kwargs:
+      T_max: 100
+      eta_min: 1.0e-08
+  optimizer:
+    type: AdamW
+    kwargs:
+      lr: 0.0001
+      betas: [0.9, 0.999]
+      weight_decay: 0.0001
+
+saver:
+  auto_resume: false
+  always_save: false
+  load_path: null
+  save_dir: checkpoints_sema_mem/
+  log_dir: logs_sema_mem/
+
+evaluator:
+  save_dir: result_eval_sema_mem
+  key_metric: mean_pixel_auc
+  metrics:
+    auc:
+      - name: std
+      - name: max
+        kwargs:
+          avgpool_size: [16, 16]
+      - name: pixel
+
+frozen_layers:
+  - backbone
+
+net:
+  - name: backbone
+    type: models.backbones.efficientnet_b4
+    frozen: true
+    kwargs:
+      pretrained: true
+      outlayers: [1, 2, 3, 4]
+      outstrides: [4, 8, 16, 32]
+  - name: neck
+    prev: backbone
+    type: models.necks.MFCN
+    kwargs:
+      outplanes: [120]
+      outstrides: [16]
+  - name: reconstruction
+    prev: neck
+    type: models.reconstructions.UniADMemorySEMA
+    kwargs:
+      pos_embed_type: learned
+      hidden_dim: 256
+      nhead: 8
+      num_encoder_layers: 4
+      num_decoder_layers: 4
+      dim_feedforward: 1024
+      feature_size: [14, 14]
+      dropout: 0.1
+      activation: relu
+      normalize_before: false
+      memory_size: 256
+      feature_jitter:
+        scale: 20.0
+        prob: 1.0
+      save_recon:
+        save_dir: result_recon_sema_mem
+      initializer:
+        method: xavier_uniform
+      sema_config:
+        use_sema: true
+        sema_position: ffn
+        sema_mode: parallel
+        adapter_bottleneck: 64
+        adapter_dropout: 0.1
+        adapter_scalar: 1.0
+        adapter_layernorm: in
+        rd_dim: 64
+        rd_buffer_size: 500
+        expansion_threshold: 3.0
+        sema_start_layer: 0
+        sema_end_layer: 7

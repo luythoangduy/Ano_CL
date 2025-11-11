@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from models.base_learner import BaseLearner
 from models.model_helper import ModelHelper
+from models.cl_strategies import build_cl_strategy
 from utils.criterion_helper import build_criterion
 from utils.lr_helper import get_scheduler
 from utils.optimizer_helper import get_optimizer
@@ -43,6 +44,10 @@ class UniADLearner(BaseLearner):
 
         # Store full config for training
         self.config = args.get("config", None)
+
+        # CL Strategy
+        self.cl_strategy = build_cl_strategy(args.get("config", {}))
+        logging.info(f"Using CL Strategy: {self.cl_strategy.strategy_name}")
 
         logging.info(f"Active layers for training: {self.active_layers}")
         logging.info(f"Frozen layers: {self.frozen_layers}")
@@ -237,3 +242,13 @@ class UniADLearner(BaseLearner):
             output: Network output dict
         """
         return self._network(input)
+
+    def after_task(self):
+        """
+        Operations to perform after each task.
+        Delegates to CL strategy.
+        """
+        super().after_task()
+
+        # Apply CL strategy
+        self.cl_strategy.after_task(self._network, self._cur_task)
