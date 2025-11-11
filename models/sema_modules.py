@@ -173,6 +173,7 @@ class SEMAModules(nn.Module):
         """
         adapter_id = f"layer_{self.layer_id}.adapter_{len(self.adapters)}"
         logging.info(f"✨ Adding adapter: {adapter_id}")
+        
         # Create new adapter
         new_adapter = AdapterModule(
             adapter_id=adapter_id,
@@ -237,7 +238,7 @@ class SEMAModules(nn.Module):
             out = self.adapters[0](x)
             return {
                 'output': out['func_out'],
-                'rd_loss': out['rd_loss'].to(device),  # Ensure device
+                'rd_loss': out['rd_loss'].to(device),
                 'added': False
             }
 
@@ -249,8 +250,8 @@ class SEMAModules(nn.Module):
         for adapter in self.adapters:
             out = adapter(x)
             func_outs.append(out['func_out'])
-            rd_losses.append(out['rd_loss'].to(device))  # Ensure device
-            z_scores.append(out['z_score'].to(device))  # Ensure device
+            rd_losses.append(out['rd_loss'].to(device))
+            z_scores.append(out['z_score'].to(device))
 
         func_outs = torch.stack(func_outs)  # [num_adapters, ...]
         rd_losses = torch.stack(rd_losses)  # [num_adapters, batch]
@@ -306,49 +307,41 @@ class SEMAModules(nn.Module):
 
         mixed_output = (func_outs * weights).sum(dim=0)
 
-        # RD loss (only for trainable adapters - FIX from previous issue)
+        # RD loss - compute for all trainable adapters
         rd_loss = torch.tensor(0.0, device=device)
         num_trainable = 0
+        
         for i, adapter in enumerate(self.adapters):
-            if adapter.training:
-                rd_loss += rd_losses[i].mean()  # [batch]rate(self.adapters):
-                num_trainable += 1pter is trainable (not frozen)
-   if adapter.newly_added or any(p.requires_grad for p in adapter.functional.parameters()):
-        rd_loss = rd_loss / num_trainable if num_trainable > 0 else rd_loss                rd_loss = rd_loss + rd_losses[i].mean()
- 1
+            # Check if adapter is trainable (not frozen)
+            if adapter.newly_added or any(p.requires_grad for p in adapter.functional.parameters()):
+                rd_loss = rd_loss + rd_losses[i].mean()
+                num_trainable += 1
+        
+        # Average over trainable adapters
+        if num_trainable > 0:
+            rd_loss = rd_loss / num_trainable
+
         return {
-            'output': mixed_output,ble adapters
+            'output': mixed_output,
             'rd_loss': rd_loss,
-            'added': Falses / num_trainable
+            'added': False
         }
 
-    def end_task_training(self):utput,
-        """Called after each task - freeze adapters and merge routers"""            'rd_loss': rd_loss,
-        # Freeze all adapterslse
+    def end_task_training(self):
+        """Called after each task - freeze adapters and merge routers"""
+        # Freeze all adapters
         for adapter in self.adapters:
             adapter.freeze()
-    def end_task_training(self):
-        # Merge routers if neededer each task - freeze adapters and merge routers"""
+
+        # Merge routers if needed
         self._merge_routers()
-        for adapter in self.adapters:
+
         # Freeze router
         for param in self.router.parameters():
             param.requires_grad = False
 
         # Reset flags
-        self.added_for_task = False        # Freeze router
-ers():
-        logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters")
-
-    def enable_outlier_detection(self):        # Reset flags
-
-
-
-
-
-
-
-        self.detecting_outlier = False        """Disable outlier detection"""    def disable_outlier_detection(self):        self.detecting_outlier = True        """Enable outlier detection for next task"""        self.added_for_task = False
+        self.added_for_task = False
 
         logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters")
 
