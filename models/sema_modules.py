@@ -172,7 +172,7 @@ class SEMAModules(nn.Module):
             initialize: If True, this is the first adapter (no router update)
         """
         adapter_id = f"layer_{self.layer_id}.adapter_{len(self.adapters)}"
-
+        print(f"Adding adapter: {adapter_id}")
         # Create new adapter
         new_adapter = AdapterModule(
             adapter_id=adapter_id,
