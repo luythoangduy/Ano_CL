@@ -77,6 +77,11 @@ class Adapter(nn.Module):
         device = x.device
         if next(self.adapter_layer_norm_before.parameters()).device != device:
             self.adapter_layer_norm_before = self.adapter_layer_norm_before.to(device)
+        if next(self.down_proj.parameters()).device != device:
+            self.down_proj = self.down_proj.to(device)
+        if next(self.up_proj.parameters()).device != device:
+            self.up_proj = self.up_proj.to(device)
+        
         if self.adapter_layernorm_option == 'in':
             x = self.adapter_layer_norm_before(x)
 
