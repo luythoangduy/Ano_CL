@@ -260,15 +260,29 @@ class SEMAModules(nn.Module):
         z_scores = torch.stack(z_scores)  # [num_adapters, batch]
 
         # Check expansion criteria
+        # Expand if: min z-score across ALL adapters > threshold
+        # This means ALL existing adapters struggle with current data
+        min_z_score_per_adapter = z_scores.mean(dim=1)  # [num_adapters]
+        min_z_score = min_z_score_per_adapter.min().item()
+
         should_expand = (
             self.detecting_outlier and
             not self.added_for_task and
             self.training and
-            z_scores.mean(dim=1).min() > self.exp_threshold
+            min_z_score > self.exp_threshold
         )
+
+        # Debug logging (every 100 batches to avoid spam)
+        if self.detecting_outlier and hasattr(self, '_debug_counter'):
+            self._debug_counter = getattr(self, '_debug_counter', 0) + 1
+            if self._debug_counter % 100 == 0:
+                logging.debug(f"Layer {self.layer_id}: Z-score={min_z_score:.2f}, "
+                            f"detecting={self.detecting_outlier}, added={self.added_for_task}, "
+                            f"training={self.training}")
 
         if should_expand:
             # Add new adapter
+            logging.info(f"✨ Layer {self.layer_id}: Expanding! Min Z-score = {min_z_score:.2f} > {self.exp_threshold}")
             self._add_adapter()
 
             # Return zero output (new adapter not trained yet)
