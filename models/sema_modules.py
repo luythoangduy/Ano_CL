@@ -330,7 +330,13 @@ class SEMAModules(nn.Module):
         }
 
     def end_task_training(self):
-        """Called after each task - freeze adapters and merge routers"""
+        """
+        Called after each task - freeze OLD adapters
+
+        Important: Keep router trainable for future expansion
+        - Old adapters: frozen (learned knowledge)
+        - Router: trainable (needed to add/route new adapters)
+        """
         # Freeze all adapters
         for adapter in self.adapters:
             adapter.freeze()
@@ -338,14 +344,15 @@ class SEMAModules(nn.Module):
         # Merge routers if needed
         self._merge_routers()
 
-        # Freeze router
-        for param in self.router.parameters():
-            param.requires_grad = False
+        # DO NOT freeze router - it needs to be trainable for:
+        # 1. Adding new adapters (new_router)
+        # 2. Learning to route to new adapters
+        # Router will stay trainable across tasks
 
         # Reset flags
         self.added_for_task = False
 
-        logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters")
+        logging.info(f"📌 Layer {self.layer_id}: Froze {len(self.adapters)} adapters (router stays trainable)")
 
     def enable_outlier_detection(self):
         """Enable outlier detection for next task"""

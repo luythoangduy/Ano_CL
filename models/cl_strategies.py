@@ -269,18 +269,34 @@ class SEMAStrategy(CLStrategy):
                     param.requires_grad = False
                 logging.info("  ❄️ Neck frozen")
 
-            # Freeze reconstruction base (but keep adapters trainable)
+            # Freeze reconstruction base (but keep adapters + routers trainable)
             if hasattr(reconstruction, 'freeze_base_modules'):
                 # Custom method to freeze everything except adapters
                 reconstruction.freeze_base_modules()
                 logging.info("  ❄️ Reconstruction base frozen (adapters trainable)")
             else:
-                # Fallback: Freeze all reconstruction except SEMA adapters
+                # Fallback: Freeze all reconstruction except SEMA adapters/routers
+                frozen_count = 0
+                trainable_count = 0
                 for name, param in reconstruction.named_parameters():
-                    # Keep adapters trainable
-                    if 'adapter' not in name.lower() and 'router' not in name.lower():
+                    # Keep adapters and routers trainable for expansion
+                    # Check for SEMA-related parameters (adapters, RD, routers)
+                    keep_trainable = any([
+                        'sema' in name.lower(),
+                        'adapter' in name.lower(),
+                        'router' in name.lower(),
+                        '.rd.' in name.lower(),  # RD autoencoder
+                        'rd_' in name.lower()
+                    ])
+
+                    if keep_trainable:
+                        param.requires_grad = True
+                        trainable_count += 1
+                    else:
                         param.requires_grad = False
-                logging.info("  ❄️ Reconstruction base frozen (adapters trainable)")
+                        frozen_count += 1
+
+                logging.info(f"  ❄️ Reconstruction base: {frozen_count} frozen, {trainable_count} trainable (SEMA components)")
 
 
 class SEMAMemExpandStrategy(CLStrategy):

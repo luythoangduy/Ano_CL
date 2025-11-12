@@ -119,7 +119,22 @@ class UniADLearner(BaseLearner):
         for layer_name in self.active_layers:
             if hasattr(self._network, layer_name):
                 layer = getattr(self._network, layer_name)
-                parameters.append({"params": layer.parameters()})
+                trainable_params = [p for p in layer.parameters() if p.requires_grad]
+                if trainable_params:
+                    parameters.append({"params": trainable_params})
+                    logging.info(f"  Layer '{layer_name}': {len(trainable_params)} trainable params")
+                else:
+                    logging.warning(f"  Layer '{layer_name}': No trainable parameters!")
+
+        # Fallback: If no parameters in active_layers, collect all trainable params
+        if not parameters:
+            logging.warning("⚠️ No trainable parameters in active_layers! Collecting all trainable params...")
+            all_trainable = [p for p in self._network.parameters() if p.requires_grad]
+            if all_trainable:
+                parameters = [{"params": all_trainable}]
+                logging.info(f"✓ Found {len(all_trainable)} trainable parameters across all layers")
+            else:
+                raise ValueError("No trainable parameters found in the entire network!")
 
         # Create optimizer and scheduler
         optimizer_config = config.trainer.optimizer
