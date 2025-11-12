@@ -139,6 +139,15 @@ class UniADLearner(BaseLearner):
 
         logging.info(f"Total parameters: {total_params:,}")
         logging.info(f"Trainable parameters: {trainable_params:,}")
+        logging.info(f"Trainable ratio: {100 * trainable_params / total_params:.2f}%")
+
+        # Log trainable modules
+        logging.info("Trainable modules:")
+        for name, module in self._network.named_children():
+            module_trainable = sum(p.numel() for p in module.parameters() if p.requires_grad)
+            module_total = sum(p.numel() for p in module.parameters())
+            if module_total > 0:
+                logging.info(f"  {name}: {module_trainable:,} / {module_total:,} ({100*module_trainable/module_total:.1f}%)")
 
         prog_bar = tqdm(range(self.epochs_per_task))
 

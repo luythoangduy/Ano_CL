@@ -5,21 +5,16 @@ port: 11111
 cl_strategy: sema  # <- SEMA strategy
 continual_learning:
   class_order:
+    - hazelnut
     - bottle
     - cable
     - capsule
-    - carpet
-    - grid
-    - hazelnut
-    - leather
     - metal_nut
     - pill
-    - screw
-    - tile
     - toothbrush
     - transistor
-    - wood
     - zipper
+    - screw
   classes_per_task: 1
   epochs_per_task: 100
   min_lr: 1.0e-08

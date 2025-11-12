@@ -208,9 +208,14 @@ class MemoryExpansionStrategy(CLStrategy):
 
 class SEMAStrategy(CLStrategy):
     """
-    SEMA Strategy
-    - Freeze old adapters after each task
-    - Enable outlier detection for new task
+    SEMA Strategy - Freeze reconstruction base after task 0, only train adapters
+
+    Task 0: Train full reconstruction (neck + transformer + memory + adapters)
+    Task 1+: Freeze reconstruction base, only train new SEMA adapters
+
+    This ensures:
+    - Task 0: Learn reconstruction capability from scratch
+    - Task 1+: Only adapters adapt to new distributions
     """
 
     def __init__(self, config):
@@ -218,14 +223,23 @@ class SEMAStrategy(CLStrategy):
         self.strategy_name = 'sema'
 
     def after_task(self, network, task_id):
-        """Freeze SEMA adapters"""
+        """
+        Freeze components after each task
+
+        Task 0: Freeze reconstruction base (except adapters)
+        Task 1+: Freeze new adapters
+
+        Args:
+            network: The network model
+            task_id: Current task ID
+        """
         if not hasattr(network, 'reconstruction'):
             logging.warning("⚠️ SEMA: No reconstruction module found")
             return
 
         reconstruction = network.reconstruction
 
-        # Check if it's UniADMemorySEMA
+        # 1. Freeze SEMA adapters
         if hasattr(reconstruction, 'end_task_training'):
             logging.info(f"🔒 SEMA: Freezing adapters after task {task_id}")
             reconstruction.end_task_training()
@@ -244,6 +258,29 @@ class SEMAStrategy(CLStrategy):
             if hasattr(reconstruction, 'enable_outlier_detection'):
                 logging.info("🔍 SEMA: Enabling outlier detection for next task")
                 reconstruction.enable_outlier_detection()
+
+        # 2. After task 0: Freeze reconstruction base (neck + transformer + memory)
+        if task_id == 0:
+            logging.info(f"🔒 SEMA: Freezing reconstruction base after task 0")
+
+            # Freeze neck
+            if hasattr(network, 'neck'):
+                for param in network.neck.parameters():
+                    param.requires_grad = False
+                logging.info("  ❄️ Neck frozen")
+
+            # Freeze reconstruction base (but keep adapters trainable)
+            if hasattr(reconstruction, 'freeze_base_modules'):
+                # Custom method to freeze everything except adapters
+                reconstruction.freeze_base_modules()
+                logging.info("  ❄️ Reconstruction base frozen (adapters trainable)")
+            else:
+                # Fallback: Freeze all reconstruction except SEMA adapters
+                for name, param in reconstruction.named_parameters():
+                    # Keep adapters trainable
+                    if 'adapter' not in name.lower() and 'router' not in name.lower():
+                        param.requires_grad = False
+                logging.info("  ❄️ Reconstruction base frozen (adapters trainable)")
 
 
 class SEMAMemExpandStrategy(CLStrategy):
